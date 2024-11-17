@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,9 +14,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addSellerCompany, addBuyerCompany } from "@/server/invoices";
+import {
+  addSellerCompany,
+  addBuyerCompany,
+  getSellerCompaniesSimple,
+} from "@/server/invoices";
 import { useToast } from "@/hooks/use-toast";
 import { SellerCompany } from "@/types/globals";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 
 type AddCompanyDialogProps = {
   onCompanyAdded: (company: SellerCompany) => void;
@@ -25,12 +35,14 @@ type AddCompanyDialogProps = {
 export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [sellers, setSellers] = useState<{ id: string; name: string }[]>([]);
 
   const [sellerData, setSellerData] = useState({
     name: "",
     address: "",
     nip: "",
     bankAccounts: [], // Empty array for initial creation
+    buyerId: "", // Added buyerId to sellerData
   });
 
   const [buyerData, setBuyerData] = useState({
@@ -39,6 +51,16 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
     nip: "",
     sellerId: "",
   });
+
+  useEffect(() => {
+    const fetchSellers = async () => {
+      const result = await getSellerCompaniesSimple();
+      if (result.success && result.data) {
+        setSellers(result.data);
+      }
+    };
+    fetchSellers();
+  }, []);
 
   const handleSellerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +73,13 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
         });
         onCompanyAdded(result.data);
         setOpen(false);
-        setSellerData({ name: "", address: "", nip: "", bankAccounts: [] });
+        setSellerData({
+          name: "",
+          address: "",
+          nip: "",
+          bankAccounts: [],
+          buyerId: "",
+        });
       } else {
         toast({
           title: "Błąd",
@@ -199,6 +227,31 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
                   }
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="seller-select">Sprzedawca</Label>
+                <Select
+                  value={buyerData.sellerId}
+                  onValueChange={(value) =>
+                    setBuyerData({ ...buyerData, sellerId: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <span>
+                      {sellers.find((s) => s.id === buyerData.sellerId)?.name ||
+                        "Wybierz sprzedawcę"}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sellers.map((seller) => (
+                      <SelectItem key={seller.id} value={seller.id}>
+                        {seller.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <Button type="submit" className="w-full">

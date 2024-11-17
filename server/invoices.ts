@@ -127,6 +127,21 @@ export async function updateSellerCompany(
   }
 }
 
+export async function getSellerCompaniesSimple() {
+  try {
+    const companies = await prisma.sellerCompany.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+    return { success: true, data: companies };
+  } catch (error) {
+    console.error("Failed to get seller companies:", error);
+    return { success: false, error: "Failed to get seller companies" };
+  }
+}
+
 // Buyer Company Actions
 export async function addBuyerCompany(data: {
   name: string;
