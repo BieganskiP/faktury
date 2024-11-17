@@ -150,19 +150,27 @@ export function BankAccountsDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline">Zarządzaj kontami bankowymi</Button>
+        <Button variant="outline" className="w-full">
+          Zarządzaj kontami bankowymi
+        </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[625px]">
-        <DialogHeader>
-          <DialogTitle>Konta bankowe - {sellerName}</DialogTitle>
-          <DialogDescription>
-            Zarządzaj kontami bankowymi firmy.
+      <DialogContent className="max-w-full w-[90vw] sm:max-w-[625px]">
+        <DialogHeader className="w-full max-w-[calc(90vw-3rem)]">
+          <DialogTitle className="flex flex-col md:flex-row md:items-start">
+            <span>Konta bankowe - </span>
+            <span>{sellerName}</span>
+          </DialogTitle>
+          <DialogDescription className="text-center">
+            <span>Zarządzaj kontami bankowymi firmy.</span>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 w-full max-w-[calc(90vw-3rem)]">
           {!isAddingNew && (
-            <Button onClick={() => setIsAddingNew(true)}>
+            <Button
+              onClick={() => setIsAddingNew(true)}
+              className="w-full sm:w-auto"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Dodaj nowe konto
             </Button>
@@ -211,18 +219,23 @@ export function BankAccountsDialog({
                 </div>
               </div>
 
-              <div className="flex space-x-2">
-                <Button type="submit">
+              <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+                <Button type="submit" className="w-full sm:w-auto">
                   {editingAccount ? "Zapisz zmiany" : "Dodaj konto"}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  className="w-full sm:w-auto"
+                >
                   Anuluj
                 </Button>
               </div>
             </form>
           )}
 
-          <Table>
+          <Table className="w-full overflow-x-auto">
             <TableHeader>
               <TableRow>
                 <TableHead>Nazwa konta</TableHead>

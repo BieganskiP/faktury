@@ -337,7 +337,7 @@ const PDFPreview: React.FC<{ data: InvoiceData }> = ({ data }) => {
   return (
     <PDFDownloadLink
       document={<InvoicePDF data={data} />}
-      fileName={`Faktura_${data.invoiceNumber}.pdf`}
+      fileName={`${data.invoiceNumber}.pdf`}
     >
       <Button size="lg">Generuj fakturę</Button>
     </PDFDownloadLink>
@@ -614,8 +614,16 @@ export default function Home() {
         </Card>
 
         {/* Seller Details Card */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
+        <div
+          className={`grid grid-cols-1 ${
+            invoiceData.seller.companyId ? "md:grid-cols-2" : "md:grid-cols-1"
+          } gap-4`}
+        >
+          <Card
+            className={`${
+              invoiceData.seller.companyId ? "md:col-span-1" : "md:col-span-2"
+            }`}
+          >
             <CardHeader>
               <CardTitle>Sprzedawca</CardTitle>
             </CardHeader>
@@ -683,8 +691,8 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-1">
                   <Label htmlFor="seller-name">Nazwa</Label>
                   <Input
                     name="seller-name"
@@ -693,7 +701,7 @@ export default function Home() {
                     readOnly
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-1">
                   <Label htmlFor="seller-nip">NIP</Label>
                   <Input
                     name="seller-nip"
@@ -702,7 +710,7 @@ export default function Home() {
                     readOnly
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="seller-address">Adres</Label>
                   <Input
                     name="seller-address"
@@ -715,113 +723,110 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          {/* Buyer Details Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Nabywca</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {invoiceData.seller.companyId && (
-                  <>
-                    <div className="flex items-center space-x-2">
-                      <Label>Wybierz istniejącego nabywcę</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsNewBuyer(!isNewBuyer)}
-                      >
-                        {isNewBuyer ? "Wybierz istniejącego" : "Dodaj nowego"}
-                      </Button>
-                    </div>
+          {invoiceData.seller.companyId && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Nabywca</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Label>Wybierz istniejącego nabywcę</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsNewBuyer(!isNewBuyer)}
+                    >
+                      {isNewBuyer ? "Wybierz istniejącego" : "Dodaj nowego"}
+                    </Button>
+                  </div>
 
-                    {!isNewBuyer ? (
-                      <Select
-                        value={invoiceData.buyer.companyId}
-                        onValueChange={(value) => {
-                          const selectedBuyer = buyers.find(
-                            (b) => b.id === value
-                          );
-                          if (selectedBuyer) {
+                  {!isNewBuyer ? (
+                    <Select
+                      value={invoiceData.buyer.companyId}
+                      onValueChange={(value) => {
+                        const selectedBuyer = buyers.find(
+                          (b) => b.id === value
+                        );
+                        if (selectedBuyer) {
+                          setInvoiceData({
+                            ...invoiceData,
+                            buyer: {
+                              companyId: value,
+                              name: selectedBuyer.name,
+                              address: selectedBuyer.address,
+                              nip: selectedBuyer.nip,
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Wybierz nabywcę" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {buyers.map((buyer) => (
+                          <SelectItem key={buyer.id} value={buyer.id}>
+                            {buyer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Nazwa firmy</Label>
+                        <Input
+                          value={invoiceData.buyer.name}
+                          onChange={(e) =>
                             setInvoiceData({
                               ...invoiceData,
                               buyer: {
-                                companyId: value,
-                                name: selectedBuyer.name,
-                                address: selectedBuyer.address,
-                                nip: selectedBuyer.nip,
+                                ...invoiceData.buyer,
+                                companyId: "0",
+                                name: e.target.value,
                               },
-                            });
+                            })
                           }
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Wybierz nabywcę" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {buyers.map((buyer) => (
-                            <SelectItem key={buyer.id} value={buyer.id}>
-                              {buyer.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Nazwa firmy</Label>
-                          <Input
-                            value={invoiceData.buyer.name}
-                            onChange={(e) =>
-                              setInvoiceData({
-                                ...invoiceData,
-                                buyer: {
-                                  ...invoiceData.buyer,
-                                  companyId: "0",
-                                  name: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <Label>Adres</Label>
-                          <Input
-                            value={invoiceData.buyer.address}
-                            onChange={(e) =>
-                              setInvoiceData({
-                                ...invoiceData,
-                                buyer: {
-                                  ...invoiceData.buyer,
-                                  address: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <Label>NIP</Label>
-                          <Input
-                            value={invoiceData.buyer.nip}
-                            onChange={(e) =>
-                              setInvoiceData({
-                                ...invoiceData,
-                                buyer: {
-                                  ...invoiceData.buyer,
-                                  nip: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                        </div>
+                        />
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                      <div>
+                        <Label>Adres</Label>
+                        <Input
+                          value={invoiceData.buyer.address}
+                          onChange={(e) =>
+                            setInvoiceData({
+                              ...invoiceData,
+                              buyer: {
+                                ...invoiceData.buyer,
+                                address: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label>NIP</Label>
+                        <Input
+                          value={invoiceData.buyer.nip}
+                          onChange={(e) =>
+                            setInvoiceData({
+                              ...invoiceData,
+                              buyer: {
+                                ...invoiceData.buyer,
+                                nip: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Items Card */}
@@ -981,15 +986,13 @@ export default function Home() {
         </Card>
 
         {/* Actions */}
-        <div className="flex justify-end space-x-4">
+        <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 justify-end md:space-x-4">
           <Button variant="outline">Anuluj</Button>
-          <Button onClick={handleCreateInvoice}>Zapisz fakturę</Button>
+          <Button onClick={handleCreateInvoice}>Zapisz fakturę</Button>{" "}
+          <PDFPreview data={invoiceData} />
         </div>
 
         {/* PDF Preview */}
-        <div className="mt-6">
-          <PDFPreview data={invoiceData} />
-        </div>
       </div>
     </div>
   );

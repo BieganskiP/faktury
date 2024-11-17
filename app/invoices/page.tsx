@@ -156,8 +156,8 @@ export default function InvoicesList() {
                 key={invoice.id}
                 className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                  <div className="md:col-span-2">
                     <h3 className="font-medium">{invoice.invoiceNumber}</h3>
                     <p className="text-sm text-gray-500">
                       Data wystawienia: {formatDate(invoice.dateIssued)}
@@ -169,15 +169,15 @@ export default function InvoicesList() {
                       Nabywca: {invoice.buyer.name}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-4">
-                    <div className="text-right">
-                      <p className="text-sm">
-                        Netto: {invoice.totals.netTotal.toFixed(2)} PLN
-                      </p>
-                      <p className="font-medium">
-                        Brutto: {invoice.totals.bruttoTotal.toFixed(2)} PLN
-                      </p>
-                    </div>
+                  <div className="text-right md:text-left">
+                    <p className="text-sm">
+                      Netto: {invoice.totals.netTotal.toFixed(2)} PLN
+                    </p>
+                    <p className="font-medium">
+                      Brutto: {invoice.totals.bruttoTotal.toFixed(2)} PLN
+                    </p>
+                  </div>
+                  <div className="flex justify-end md:justify-start">
                     <DialogTrigger asChild>
                       <Button
                         variant="destructive"

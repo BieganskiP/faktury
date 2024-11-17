@@ -48,7 +48,10 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <Link
                         href={item.href}
-                        className={cn(isActive(item.href) && "text-primary")}
+                        className={cn(
+                          "text-lg",
+                          isActive(item.href) && "text-primary font-bold"
+                        )}
                       >
                         {item.label}
                       </Link>

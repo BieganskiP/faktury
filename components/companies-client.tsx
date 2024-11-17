@@ -41,14 +41,28 @@ export function CompaniesClient({ initialCompanies }: CompaniesClientProps) {
             {companies?.data?.map((company) => (
               <li
                 key={company.id}
-                className="flex justify-between items-center"
+                className="flex justify-between items-center flex-col md:flex-row gap-4 p-4 border rounded-lg shadow-sm"
               >
-                <span>
-                  {company.name}, {company.address}, {company.nip},{" "}
-                  {company.bankAccounts
-                    .map((bankAccount) => bankAccount.accountName)
-                    .join(", ")}
-                </span>
+                <div className="flex flex-col gap-2">
+                  <p>
+                    <span className="font-bold">Firma: </span>
+                    {company.name}
+                  </p>
+                  <p>
+                    <span className="font-bold">Adres: </span>
+                    {company.address}
+                  </p>
+                  <p>
+                    <span className="font-bold">NIP: </span>
+                    {company.nip}
+                  </p>
+                  <p>
+                    <span className="font-bold">Konta bankowe: </span>
+                    {company.bankAccounts
+                      .map((bankAccount) => bankAccount.accountName)
+                      .join(", ")}
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <BankAccountsDialog
                     sellerId={company.id}

@@ -2,6 +2,7 @@
 import { InvoiceData } from "@/types/globals";
 import { PrismaClient } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { ApiResponse, BuyerCompany } from "@/types/globals";
 
 const prisma = new PrismaClient();
 
@@ -149,6 +150,46 @@ export async function addBuyerCompany(data: {
   } catch (error) {
     console.error("Failed to add buyer company:", error);
     return { success: false, error: "Failed to add buyer company" };
+  }
+}
+
+export async function getBuyerCompanies(): Promise<
+  ApiResponse<BuyerCompany[]>
+> {
+  try {
+    const companies = await prisma.buyerCompany.findMany({
+      select: {
+        id: true,
+        name: true,
+        nip: true,
+        address: true,
+        sellers: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    // Transform the data to match the BuyerCompany type
+    const transformedCompanies = companies.map((company) => ({
+      id: company.id,
+      name: company.name,
+      nip: company.nip,
+      address: company.address,
+      sellerId: company.sellers[0]?.id || "", // Take the first seller's ID or empty string
+    }));
+
+    return {
+      success: true,
+      data: transformedCompanies,
+    };
+  } catch (error) {
+    console.error("Failed to fetch buyer companies:", error);
+    return {
+      success: false,
+      error: "Failed to fetch buyer companies",
+    };
   }
 }
 
@@ -361,19 +402,46 @@ export async function deleteInvoice(id: string) {
   }
 }
 
-export async function deleteBuyerCompany(id: string) {
+export async function deleteBuyerCompany(
+  id: string
+): Promise<ApiResponse<void>> {
   try {
+    const buyerCompany = await prisma.buyerCompany.findFirst({
+      where: { id },
+      include: {
+        invoicesAsBuyer: true,
+      },
+    });
+
+    if (!buyerCompany) {
+      return {
+        success: false,
+        error: "Buyer company not found",
+      };
+    }
+
+    if (buyerCompany.invoicesAsBuyer.length > 0) {
+      return {
+        success: false,
+        error: "Nie można usunąć kontrahenta z istniejącymi fakturami",
+      };
+    }
+
     await prisma.buyerCompany.delete({
       where: { id },
     });
-    revalidatePath("/");
+
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete buyer company:", error);
-    return { success: false, error: "Failed to delete buyer company" };
+    if (error instanceof Error) {
+      console.error("Failed to delete buyer company:", error.message);
+    }
+    return {
+      success: false,
+      error: "Failed to delete buyer company",
+    };
   }
 }
-
 export async function deleteSellerCompany(id: string) {
   try {
     // First delete all related invoices and buyer relationships

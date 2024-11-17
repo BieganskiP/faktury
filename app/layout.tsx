@@ -19,21 +19,23 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pl">
-      <body className="antialiased">
-        <Toaster />
-        <SidebarProvider>
+      <body className="antialiased ">
+        <SidebarProvider className="w-full">
+          <Toaster />
           <VisuallyHidden.Root>
             <div id="sidebar-title">Menu nawigacyjne</div>
           </VisuallyHidden.Root>
-
           <AppSidebar />
-          <SidebarTrigger className="m-4 lg:hidden">
-            <Button variant="outline" size="icon">
-              <Menu className="h-4 w-4" />
-              <span className="sr-only">Toggle menu</span>
-            </Button>
-          </SidebarTrigger>
-          <main className="p-4 lg:p-10 w-full">{children}</main>
+
+          <main className="p-4 lg:p-10 w-full relative">
+            <SidebarTrigger className="absolute top-4 left-4">
+              <Button variant="outline" size="icon">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </SidebarTrigger>
+            {children}
+          </main>
         </SidebarProvider>
       </body>
     </html>
