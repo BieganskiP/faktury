@@ -316,10 +316,13 @@ const PDFPreview: React.FC<{ data: InvoiceData }> = ({ data }) => {
     setIsClient(true);
   }, []);
 
-  if (!isClient) {
+  // Add validation check
+  const isValidData =
+    data.items.length > 0 && data.invoiceNumber && data.dateIssued;
+
+  if (!isClient || !isValidData) {
     return null;
   }
-
   return (
     <PDFDownloadLink
       document={<InvoicePDF data={data} />}
@@ -372,9 +375,10 @@ export default function Home() {
           </CardHeader>
           <CardContent className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Numer faktury</Label>
+              <Label htmlFor="invoice-number">Numer faktury</Label>
               <Input
-                id="invoiceNumber"
+                id="invoice-number"
+                name="invoice-number"
                 placeholder="FV/2024/04/001"
                 value={invoiceData.invoiceNumber}
                 onChange={(e) =>
@@ -386,9 +390,10 @@ export default function Home() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dateIssued">Data wystawienia</Label>
+              <Label htmlFor="date-issued">Data wystawienia</Label>
               <Input
-                id="dateIssued"
+                id="date-issued"
+                name="date-issued"
                 type="date"
                 value={invoiceData.dateIssued}
                 onChange={(e) =>
@@ -400,9 +405,9 @@ export default function Home() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dateSale">Data sprzedaży</Label>
+              <Label htmlFor="date-sale">Data sprzedaży</Label>
               <Input
-                id="dateSale"
+                id="date-sale"
                 type="date"
                 value={invoiceData.dateSale}
                 onChange={(e) =>
@@ -417,140 +422,147 @@ export default function Home() {
         </Card>
 
         {/* Seller Details Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Sprzedawca</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="sellerCompany">Wybierz firmę</Label>
-              <Select
-                onValueChange={(value) => {
-                  const selectedCompany = data.companies.find(
-                    (c) => c.id === value
-                  );
-                  if (selectedCompany) {
-                    setInvoiceData({
-                      ...invoiceData,
-                      seller: {
-                        ...invoiceData.seller,
-                        companyId: value,
-                        name: selectedCompany.name,
-                        address: `${selectedCompany.address.street}, ${selectedCompany.address.postalCode} ${selectedCompany.address.city}`,
-                        nip: selectedCompany.nip,
-                      },
-                    });
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Wybierz firmę" />
-                </SelectTrigger>
-                <SelectContent>
-                  {data.companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sprzedawca</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="sellerName">Nazwa</Label>
+                <Label>Wybierz firmę</Label>
+                <Select
+                  onValueChange={(value) => {
+                    const selectedCompany = data.companies.find(
+                      (c) => c.id === value
+                    );
+                    if (selectedCompany) {
+                      setInvoiceData({
+                        ...invoiceData,
+                        seller: {
+                          ...invoiceData.seller,
+                          companyId: value,
+                          name: selectedCompany.name,
+                          address: `${selectedCompany.address.street}, ${selectedCompany.address.postalCode} ${selectedCompany.address.city}`,
+                          nip: selectedCompany.nip,
+                        },
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Wybierz firmę" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {data.companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="seller-name">Nazwa</Label>
+                  <Input
+                    name="seller-name"
+                    id="seller-name"
+                    value={invoiceData.seller.name}
+                    onChange={(e) =>
+                      setInvoiceData({
+                        ...invoiceData,
+                        seller: { ...invoiceData.seller, name: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="seller-nip">NIP</Label>
+                  <Input
+                    name="seller-nip"
+                    id="seller-nip"
+                    value={invoiceData.seller.nip}
+                    onChange={(e) =>
+                      setInvoiceData({
+                        ...invoiceData,
+                        seller: { ...invoiceData.seller, nip: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="seller-address">Adres</Label>
+                  <Input
+                    name="seller-address"
+                    id="seller-address"
+                    value={invoiceData.seller.address}
+                    onChange={(e) =>
+                      setInvoiceData({
+                        ...invoiceData,
+                        seller: {
+                          ...invoiceData.seller,
+                          address: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Buyer Details Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Nabywca</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="buyer-name">Nazwa</Label>
                 <Input
-                  id="sellerName"
-                  value={invoiceData.seller.name}
+                  id="buyer-name"
+                  name="buyer-name"
+                  value={invoiceData.buyer.name}
                   onChange={(e) =>
                     setInvoiceData({
                       ...invoiceData,
-                      seller: { ...invoiceData.seller, name: e.target.value },
+                      buyer: { ...invoiceData.buyer, name: e.target.value },
                     })
                   }
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="sellerNIP">NIP</Label>
+                <Label htmlFor="buyer-nip">NIP</Label>
                 <Input
-                  id="sellerNIP"
-                  value={invoiceData.seller.nip}
+                  id="buyer-nip"
+                  name="buyer-nip"
+                  value={invoiceData.buyer.nip}
                   onChange={(e) =>
                     setInvoiceData({
                       ...invoiceData,
-                      seller: { ...invoiceData.seller, nip: e.target.value },
+                      buyer: { ...invoiceData.buyer, nip: e.target.value },
                     })
                   }
                 />
               </div>
               <div className="col-span-2 space-y-2">
-                <Label htmlFor="sellerAddress">Adres</Label>
+                <Label htmlFor="buyer-address">Adres</Label>
                 <Input
-                  id="sellerAddress"
-                  value={invoiceData.seller.address}
+                  id="buyer-address"
+                  name="buyer-address"
+                  value={invoiceData.buyer.address}
                   onChange={(e) =>
                     setInvoiceData({
                       ...invoiceData,
-                      seller: {
-                        ...invoiceData.seller,
-                        address: e.target.value,
-                      },
+                      buyer: { ...invoiceData.buyer, address: e.target.value },
                     })
                   }
                 />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Buyer Details Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Nabywca</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="buyerName">Nazwa</Label>
-              <Input
-                id="buyerName"
-                value={invoiceData.buyer.name}
-                onChange={(e) =>
-                  setInvoiceData({
-                    ...invoiceData,
-                    buyer: { ...invoiceData.buyer, name: e.target.value },
-                  })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="buyerNIP">NIP</Label>
-              <Input
-                id="buyerNIP"
-                value={invoiceData.buyer.nip}
-                onChange={(e) =>
-                  setInvoiceData({
-                    ...invoiceData,
-                    buyer: { ...invoiceData.buyer, nip: e.target.value },
-                  })
-                }
-              />
-            </div>
-            <div className="col-span-2 space-y-2">
-              <Label htmlFor="buyerAddress">Adres</Label>
-              <Input
-                id="buyerAddress"
-                value={invoiceData.buyer.address}
-                onChange={(e) =>
-                  setInvoiceData({
-                    ...invoiceData,
-                    buyer: { ...invoiceData.buyer, address: e.target.value },
-                  })
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
-
+            </CardContent>
+          </Card>
+        </div>
         {/* Items Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -577,135 +589,147 @@ export default function Home() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {invoiceData.items.map((item, index) => (
-              <div
-                key={index}
-                className="grid grid-cols-12 gap-4 items-end border-b pb-4"
-              >
-                <div className="col-span-4 space-y-2">
-                  <Label>Opis</Label>
-                  <Input
-                    value={item.description}
-                    onChange={(e) => {
-                      const newItems = [...invoiceData.items];
-                      newItems[index].description = e.target.value;
-                      setInvoiceData({ ...invoiceData, items: newItems });
-                    }}
-                  />
+            {invoiceData.items.map((item, index) => {
+              const itemTotal = roundTo2Decimals(
+                item.bruttoPrice * item.quantity
+              );
+              return (
+                <div
+                  key={index}
+                  className="grid grid-cols-12 gap-4 items-end border-b pb-4"
+                >
+                  <div className="col-span-3 space-y-2">
+                    <Label htmlFor={`item-description-${index}`}>Opis</Label>
+                    <Input
+                      id={`item-description-${index}`}
+                      name={`item-description-${index}`}
+                      value={item.description}
+                      onChange={(e) => {
+                        const newItems = [...invoiceData.items];
+                        newItems[index].description = e.target.value;
+                        setInvoiceData({ ...invoiceData, items: newItems });
+                      }}
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-2">
+                    <Label htmlFor={`item-quantity-${index}`}>Ilość</Label>
+                    <Input
+                      id={`item-quantity-${index}`}
+                      name={`item-quantity-${index}`}
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newItems = [...invoiceData.items];
+                        newItems[index].quantity = Number(e.target.value);
+                        setInvoiceData({ ...invoiceData, items: newItems });
+                      }}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor={`item-net-price-${index}`}>
+                      Cena netto
+                    </Label>
+                    <Input
+                      id={`item-net-price-${index}`}
+                      name={`item-net-price-${index}`}
+                      type="text"
+                      pattern="[0-9]*[.,]?[0-9]*"
+                      value={item.netPrice}
+                      onChange={(e) => {
+                        const newItems = [...invoiceData.items];
+                        const netValue = Number(
+                          formatNumberInput(e.target.value)
+                        );
+                        const vatRate = newItems[index].vatRate || 0;
+                        newItems[index] = {
+                          ...newItems[index],
+                          netPrice: roundTo2Decimals(netValue),
+                          bruttoPrice: roundTo2Decimals(
+                            netValue * (1 + vatRate / 100)
+                          ),
+                        };
+                        setInvoiceData({ ...invoiceData, items: newItems });
+                      }}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor={`item-brutto-price-${index}`}>
+                      Cena brutto
+                    </Label>
+                    <Input
+                      id={`item-brutto-price-${index}`}
+                      name={`item-brutto-price-${index}`}
+                      type="text"
+                      pattern="[0-9]*[.,]?[0-9]*"
+                      value={item.bruttoPrice}
+                      onChange={(e) => {
+                        const newItems = [...invoiceData.items];
+                        const bruttoValue = Number(
+                          formatNumberInput(e.target.value)
+                        );
+                        const vatRate = newItems[index].vatRate || 0;
+                        newItems[index] = {
+                          ...newItems[index],
+                          bruttoPrice: roundTo2Decimals(bruttoValue),
+                          netPrice: roundTo2Decimals(
+                            bruttoValue / (1 + vatRate / 100)
+                          ),
+                        };
+                        setInvoiceData({ ...invoiceData, items: newItems });
+                      }}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>VAT</Label>
+                    <Select
+                      name={`item-vat-rate-${index}`}
+                      value={String(item.vatRate)}
+                      onValueChange={(value) => {
+                        const newItems = [...invoiceData.items];
+                        const vatRate = value === "null" ? 0 : Number(value);
+                        const netPrice = newItems[index].netPrice;
+                        newItems[index] = {
+                          ...newItems[index],
+                          vatRate: vatRate,
+                          bruttoPrice: roundTo2Decimals(
+                            netPrice * (1 + vatRate / 100)
+                          ),
+                        };
+                        setInvoiceData({ ...invoiceData, items: newItems });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {data.vatRates.map((rate) => (
+                          <SelectItem key={rate.code} value={String(rate.rate)}>
+                            {rate.description} ({rate.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 text-right font-bold">
+                    Suma : {itemTotal.toFixed(2)} PLN{" "}
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      disabled={invoiceData.items.length === 1}
+                      onClick={() => {
+                        const newItems = invoiceData.items.filter(
+                          (_, i) => i !== index
+                        );
+                        setInvoiceData({ ...invoiceData, items: newItems });
+                      }}
+                    >
+                      ×
+                    </Button>
+                  </div>
                 </div>
-                <div className="col-span-1 space-y-2">
-                  <Label>Ilość</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => {
-                      const newItems = [...invoiceData.items];
-                      newItems[index].quantity = Number(e.target.value);
-                      setInvoiceData({ ...invoiceData, items: newItems });
-                    }}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>Cena netto</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={item.netPrice}
-                    onChange={(e) => {
-                      const newItems = [...invoiceData.items];
-                      const netValue = Number(
-                        formatNumberInput(e.target.value)
-                      );
-                      const vatRate = newItems[index].vatRate || 0;
-
-                      newItems[index] = {
-                        ...newItems[index],
-                        netPrice: roundTo2Decimals(netValue),
-                        bruttoPrice: roundTo2Decimals(
-                          netValue * (1 + vatRate / 100)
-                        ),
-                      };
-
-                      setInvoiceData({ ...invoiceData, items: newItems });
-                    }}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>Cena brutto</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={item.bruttoPrice}
-                    onChange={(e) => {
-                      const newItems = [...invoiceData.items];
-                      const bruttoValue = Number(
-                        formatNumberInput(e.target.value)
-                      );
-                      const vatRate = newItems[index].vatRate || 0;
-
-                      newItems[index] = {
-                        ...newItems[index],
-                        bruttoPrice: roundTo2Decimals(bruttoValue),
-                        netPrice: roundTo2Decimals(
-                          bruttoValue / (1 + vatRate / 100)
-                        ),
-                      };
-
-                      setInvoiceData({ ...invoiceData, items: newItems });
-                    }}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>VAT</Label>
-                  <Select
-                    value={String(item.vatRate)}
-                    onValueChange={(value) => {
-                      const newItems = [...invoiceData.items];
-                      const vatRate = value === "null" ? 0 : Number(value);
-                      const netPrice = newItems[index].netPrice;
-
-                      newItems[index] = {
-                        ...newItems[index],
-                        vatRate: vatRate,
-                        bruttoPrice: roundTo2Decimals(
-                          netPrice * (1 + vatRate / 100)
-                        ),
-                      };
-
-                      setInvoiceData({ ...invoiceData, items: newItems });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {data.vatRates.map((rate) => (
-                        <SelectItem key={rate.code} value={String(rate.rate)}>
-                          {rate.description} ({rate.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-1">
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={() => {
-                      const newItems = invoiceData.items.filter(
-                        (_, i) => i !== index
-                      );
-                      setInvoiceData({ ...invoiceData, items: newItems });
-                    }}
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Summary section */}
             <div className="mt-4 space-y-2">
