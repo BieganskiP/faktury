@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model SellerCompany {
+  id          String         @id @default(cuid())
+  name        String
+  address     String
+  nip         String
+  bankAccounts BankAccount[]
+  buyers      BuyerCompany[]
+  invoices    Invoice[]
+}
+
+model BankAccount {
+  id            String       @id @default(cuid())
+  accountName   String      
+  bankName      String    
+  accountNumber String   
+  seller        SellerCompany @relation(fields: [sellerId], references: [id])
+  sellerId      String
+  invoices      Invoice[]   
+}
+
+
+model BuyerCompany {
+  id            String         @id @default(cuid())
+  name          String
+  address       String
+  nip           String
+  sellers       SellerCompany[]
+  invoicesAsBuyer Invoice[]
+}
+
+model Invoice {
+  id           String      @id @default(cuid())
+  seller       SellerCompany @relation(fields: [sellerId], references: [id])
+  sellerId     String
+  buyer        BuyerCompany @relation(fields: [buyerId], references: [id])
+  buyerId      String
+  bankAccount  BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  invoiceNumber String
+  dateIssued   DateTime
+  dateSale     DateTime
+  items        InvoiceItem[]
+}
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId   String
+  description String
+  quantity    Int
+  netPrice    Float
+  bruttoPrice Float
+  vatRate     Float
+}

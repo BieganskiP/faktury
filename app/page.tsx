@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import data from "@/data/settings.json";
+
 import {
   PDFDownloadLink,
   Document,
@@ -24,13 +24,25 @@ import {
 } from "@react-pdf/renderer";
 import { numberToWords } from "@/lib/useNumbersToWords";
 import {
-  roundTo2Decimals,
-  formatNumberInput,
   calculateNetTotal,
   calculateVatTotal,
   calculateGrossTotal,
 } from "@/lib/useMathHelpers";
-import { InvoiceData, PDFProps } from "@/types/globals";
+import {
+  BankAccount,
+  BuyerCompany,
+  InvoiceData,
+  PDFProps,
+} from "@/types/globals";
+import {
+  createInvoice,
+  getSellerCompanies,
+  getBuyersForSeller,
+  getBankAccounts,
+} from "@/server/invoices";
+
+import { ApiResponse, SellerCompany } from "@/types/globals";
+import { useToast } from "@/hooks/use-toast";
 
 Font.register({
   family: "Roboto",
@@ -316,7 +328,6 @@ const PDFPreview: React.FC<{ data: InvoiceData }> = ({ data }) => {
     setIsClient(true);
   }, []);
 
-  // Add validation check
   const isValidData =
     data.items.length > 0 && data.invoiceNumber && data.dateIssued;
 
@@ -334,6 +345,12 @@ const PDFPreview: React.FC<{ data: InvoiceData }> = ({ data }) => {
 };
 
 export default function Home() {
+  const { toast } = useToast();
+  const [companiesData, setCompaniesData] = useState<
+    ApiResponse<SellerCompany[]>
+  >({
+    success: false,
+  });
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     invoiceNumber: "",
     dateIssued: "",
@@ -346,6 +363,7 @@ export default function Home() {
       bankAccount: "",
     },
     buyer: {
+      companyId: "",
       name: "",
       address: "",
       nip: "",
@@ -360,12 +378,186 @@ export default function Home() {
       },
     ],
   });
+  const [buyers, setBuyers] = useState<BuyerCompany[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [isNewBuyer, setIsNewBuyer] = useState(false);
 
-  const debouncedInvoiceData = useMemo(() => invoiceData, [invoiceData]);
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      const response = await getSellerCompanies();
+      setCompaniesData(response);
+    };
+    fetchCompanies();
+  }, []);
+
+  useEffect(() => {
+    const fetchBuyersAndAccounts = async () => {
+      if (invoiceData.seller.companyId) {
+        // Fetch buyers
+        const buyersResult = await getBuyersForSeller(
+          invoiceData.seller.companyId
+        );
+        if (buyersResult.success && buyersResult.data) {
+          const formattedBuyers = buyersResult.data.map((buyer) => ({
+            ...buyer,
+            sellerId: invoiceData.seller.companyId,
+          }));
+          setBuyers(formattedBuyers);
+        }
+
+        // Fetch bank accounts
+        const accountsResult = await getBankAccounts(
+          invoiceData.seller.companyId
+        );
+        if (accountsResult.success && accountsResult.data) {
+          setBankAccounts(accountsResult.data);
+        }
+      }
+    };
+
+    fetchBuyersAndAccounts();
+  }, [invoiceData.seller.companyId]);
+
+  const handleCreateInvoice = async () => {
+    // Validate required fields
+    if (
+      !invoiceData.invoiceNumber ||
+      !invoiceData.dateIssued ||
+      !invoiceData.dateSale
+    ) {
+      toast({
+        title: "Błąd",
+        description: "Uzupełnij podstawowe dane faktury (numer, daty)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!invoiceData.seller.companyId || !invoiceData.seller.bankAccount) {
+      toast({
+        title: "Błąd",
+        description: "Wybierz sprzedawcę i konto bankowe",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate buyer data
+    if (!isNewBuyer && !invoiceData.buyer.companyId) {
+      toast({
+        title: "Błąd",
+        description: "Wybierz nabywcę",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (
+      isNewBuyer &&
+      (!invoiceData.buyer.name ||
+        !invoiceData.buyer.address ||
+        !invoiceData.buyer.nip)
+    ) {
+      toast({
+        title: "Błąd",
+        description: "Uzupełnij dane nowego nabywcy",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate items
+    if (
+      !invoiceData.items.length ||
+      !invoiceData.items.every(
+        (item) =>
+          item.description &&
+          item.quantity > 0 &&
+          item.netPrice > 0 &&
+          item.bruttoPrice > 0
+      )
+    ) {
+      toast({
+        title: "Błąd",
+        description: "Uzupełnij wszystkie pozycje faktury",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Prepare the invoice data
+      const invoicePayload = {
+        ...invoiceData,
+        buyer: {
+          ...invoiceData.buyer,
+          companyId: isNewBuyer ? "0" : invoiceData.buyer.companyId,
+        },
+        items: invoiceData.items.map((item) => ({
+          description: item.description,
+          quantity: Number(item.quantity),
+          netPrice: Number(item.netPrice),
+          bruttoPrice: Number(item.bruttoPrice),
+          vatRate: Number(item.vatRate),
+        })),
+      };
+
+      const response = await createInvoice(invoicePayload);
+
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+
+      toast({
+        title: "Sukces",
+        description: "Faktura została utworzona",
+      });
+
+      // Reset form
+      setInvoiceData({
+        invoiceNumber: "",
+        dateIssued: "",
+        dateSale: "",
+        seller: {
+          companyId: "",
+          name: "",
+          address: "",
+          nip: "",
+          bankAccount: "",
+        },
+        buyer: {
+          companyId: "",
+          name: "",
+          address: "",
+          nip: "",
+        },
+        items: [
+          {
+            description: "",
+            quantity: 1,
+            netPrice: 0,
+            bruttoPrice: 0,
+            vatRate: 23,
+          },
+        ],
+      });
+      setIsNewBuyer(false);
+    } catch (error) {
+      console.error("Failed to create invoice:", error);
+      toast({
+        title: "Błąd",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Nie udało się utworzyć faktury",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Generator Faktur</h1>
+      <h1 className="text-3xl font-bold mb-6">Nowa Faktura</h1>
 
       <div className="space-y-6">
         {/* Invoice Details Card */}
@@ -373,7 +565,7 @@ export default function Home() {
           <CardHeader>
             <CardTitle>Dane faktury</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="invoice-number">Numer faktury</Label>
               <Input
@@ -422,7 +614,7 @@ export default function Home() {
         </Card>
 
         {/* Seller Details Card */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Sprzedawca</CardTitle>
@@ -432,7 +624,7 @@ export default function Home() {
                 <Label>Wybierz firmę</Label>
                 <Select
                   onValueChange={(value) => {
-                    const selectedCompany = data.companies.find(
+                    const selectedCompany = companiesData.data?.find(
                       (c) => c.id === value
                     );
                     if (selectedCompany) {
@@ -442,7 +634,7 @@ export default function Home() {
                           ...invoiceData.seller,
                           companyId: value,
                           name: selectedCompany.name,
-                          address: `${selectedCompany.address.street}, ${selectedCompany.address.postalCode} ${selectedCompany.address.city}`,
+                          address: selectedCompany.address,
                           nip: selectedCompany.nip,
                         },
                       });
@@ -453,7 +645,7 @@ export default function Home() {
                     <SelectValue placeholder="Wybierz firmę" />
                   </SelectTrigger>
                   <SelectContent>
-                    {data.companies.map((company) => (
+                    {companiesData.data?.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
                       </SelectItem>
@@ -462,6 +654,35 @@ export default function Home() {
                 </Select>
               </div>
 
+              {invoiceData.seller.companyId && (
+                <div className="space-y-2">
+                  <Label>Konto bankowe</Label>
+                  <Select
+                    value={invoiceData.seller.bankAccount}
+                    onValueChange={(value) => {
+                      setInvoiceData({
+                        ...invoiceData,
+                        seller: {
+                          ...invoiceData.seller,
+                          bankAccount: value,
+                        },
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Wybierz konto bankowe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.accountName} - {account.bankName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="seller-name">Nazwa</Label>
@@ -469,12 +690,7 @@ export default function Home() {
                     name="seller-name"
                     id="seller-name"
                     value={invoiceData.seller.name}
-                    onChange={(e) =>
-                      setInvoiceData({
-                        ...invoiceData,
-                        seller: { ...invoiceData.seller, name: e.target.value },
-                      })
-                    }
+                    readOnly
                   />
                 </div>
                 <div className="space-y-2">
@@ -483,12 +699,7 @@ export default function Home() {
                     name="seller-nip"
                     id="seller-nip"
                     value={invoiceData.seller.nip}
-                    onChange={(e) =>
-                      setInvoiceData({
-                        ...invoiceData,
-                        seller: { ...invoiceData.seller, nip: e.target.value },
-                      })
-                    }
+                    readOnly
                   />
                 </div>
                 <div className="col-span-2 space-y-2">
@@ -497,15 +708,7 @@ export default function Home() {
                     name="seller-address"
                     id="seller-address"
                     value={invoiceData.seller.address}
-                    onChange={(e) =>
-                      setInvoiceData({
-                        ...invoiceData,
-                        seller: {
-                          ...invoiceData.seller,
-                          address: e.target.value,
-                        },
-                      })
-                    }
+                    readOnly
                   />
                 </div>
               </div>
@@ -517,52 +720,110 @@ export default function Home() {
             <CardHeader>
               <CardTitle>Nabywca</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="buyer-name">Nazwa</Label>
-                <Input
-                  id="buyer-name"
-                  name="buyer-name"
-                  value={invoiceData.buyer.name}
-                  onChange={(e) =>
-                    setInvoiceData({
-                      ...invoiceData,
-                      buyer: { ...invoiceData.buyer, name: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="buyer-nip">NIP</Label>
-                <Input
-                  id="buyer-nip"
-                  name="buyer-nip"
-                  value={invoiceData.buyer.nip}
-                  onChange={(e) =>
-                    setInvoiceData({
-                      ...invoiceData,
-                      buyer: { ...invoiceData.buyer, nip: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="buyer-address">Adres</Label>
-                <Input
-                  id="buyer-address"
-                  name="buyer-address"
-                  value={invoiceData.buyer.address}
-                  onChange={(e) =>
-                    setInvoiceData({
-                      ...invoiceData,
-                      buyer: { ...invoiceData.buyer, address: e.target.value },
-                    })
-                  }
-                />
+            <CardContent>
+              <div className="space-y-4">
+                {invoiceData.seller.companyId && (
+                  <>
+                    <div className="flex items-center space-x-2">
+                      <Label>Wybierz istniejącego nabywcę</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsNewBuyer(!isNewBuyer)}
+                      >
+                        {isNewBuyer ? "Wybierz istniejącego" : "Dodaj nowego"}
+                      </Button>
+                    </div>
+
+                    {!isNewBuyer ? (
+                      <Select
+                        value={invoiceData.buyer.companyId}
+                        onValueChange={(value) => {
+                          const selectedBuyer = buyers.find(
+                            (b) => b.id === value
+                          );
+                          if (selectedBuyer) {
+                            setInvoiceData({
+                              ...invoiceData,
+                              buyer: {
+                                companyId: value,
+                                name: selectedBuyer.name,
+                                address: selectedBuyer.address,
+                                nip: selectedBuyer.nip,
+                              },
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Wybierz nabywcę" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {buyers.map((buyer) => (
+                            <SelectItem key={buyer.id} value={buyer.id}>
+                              {buyer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Nazwa firmy</Label>
+                          <Input
+                            value={invoiceData.buyer.name}
+                            onChange={(e) =>
+                              setInvoiceData({
+                                ...invoiceData,
+                                buyer: {
+                                  ...invoiceData.buyer,
+                                  companyId: "0",
+                                  name: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Adres</Label>
+                          <Input
+                            value={invoiceData.buyer.address}
+                            onChange={(e) =>
+                              setInvoiceData({
+                                ...invoiceData,
+                                buyer: {
+                                  ...invoiceData.buyer,
+                                  address: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>NIP</Label>
+                          <Input
+                            value={invoiceData.buyer.nip}
+                            onChange={(e) =>
+                              setInvoiceData({
+                                ...invoiceData,
+                                buyer: {
+                                  ...invoiceData.buyer,
+                                  nip: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
+
         {/* Items Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -589,147 +850,113 @@ export default function Home() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {invoiceData.items.map((item, index) => {
-              const itemTotal = roundTo2Decimals(
-                item.bruttoPrice * item.quantity
-              );
-              return (
-                <div
-                  key={index}
-                  className="grid grid-cols-12 gap-4 items-end border-b pb-4"
-                >
-                  <div className="col-span-3 space-y-2">
-                    <Label htmlFor={`item-description-${index}`}>Opis</Label>
-                    <Input
-                      id={`item-description-${index}`}
-                      name={`item-description-${index}`}
-                      value={item.description}
-                      onChange={(e) => {
-                        const newItems = [...invoiceData.items];
-                        newItems[index].description = e.target.value;
-                        setInvoiceData({ ...invoiceData, items: newItems });
-                      }}
-                    />
-                  </div>
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor={`item-quantity-${index}`}>Ilość</Label>
-                    <Input
-                      id={`item-quantity-${index}`}
-                      name={`item-quantity-${index}`}
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const newItems = [...invoiceData.items];
-                        newItems[index].quantity = Number(e.target.value);
-                        setInvoiceData({ ...invoiceData, items: newItems });
-                      }}
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor={`item-net-price-${index}`}>
-                      Cena netto
-                    </Label>
-                    <Input
-                      id={`item-net-price-${index}`}
-                      name={`item-net-price-${index}`}
-                      type="text"
-                      pattern="[0-9]*[.,]?[0-9]*"
-                      value={item.netPrice}
-                      onChange={(e) => {
-                        const newItems = [...invoiceData.items];
-                        const netValue = Number(
-                          formatNumberInput(e.target.value)
-                        );
-                        const vatRate = newItems[index].vatRate || 0;
-                        newItems[index] = {
-                          ...newItems[index],
-                          netPrice: roundTo2Decimals(netValue),
-                          bruttoPrice: roundTo2Decimals(
-                            netValue * (1 + vatRate / 100)
-                          ),
-                        };
-                        setInvoiceData({ ...invoiceData, items: newItems });
-                      }}
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor={`item-brutto-price-${index}`}>
-                      Cena brutto
-                    </Label>
-                    <Input
-                      id={`item-brutto-price-${index}`}
-                      name={`item-brutto-price-${index}`}
-                      type="text"
-                      pattern="[0-9]*[.,]?[0-9]*"
-                      value={item.bruttoPrice}
-                      onChange={(e) => {
-                        const newItems = [...invoiceData.items];
-                        const bruttoValue = Number(
-                          formatNumberInput(e.target.value)
-                        );
-                        const vatRate = newItems[index].vatRate || 0;
-                        newItems[index] = {
-                          ...newItems[index],
-                          bruttoPrice: roundTo2Decimals(bruttoValue),
-                          netPrice: roundTo2Decimals(
-                            bruttoValue / (1 + vatRate / 100)
-                          ),
-                        };
-                        setInvoiceData({ ...invoiceData, items: newItems });
-                      }}
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label>VAT</Label>
-                    <Select
-                      name={`item-vat-rate-${index}`}
-                      value={String(item.vatRate)}
-                      onValueChange={(value) => {
-                        const newItems = [...invoiceData.items];
-                        const vatRate = value === "null" ? 0 : Number(value);
-                        const netPrice = newItems[index].netPrice;
-                        newItems[index] = {
-                          ...newItems[index],
-                          vatRate: vatRate,
-                          bruttoPrice: roundTo2Decimals(
-                            netPrice * (1 + vatRate / 100)
-                          ),
-                        };
-                        setInvoiceData({ ...invoiceData, items: newItems });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {data.vatRates.map((rate) => (
-                          <SelectItem key={rate.code} value={String(rate.rate)}>
-                            {rate.description} ({rate.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2 text-right font-bold">
-                    Suma : {itemTotal.toFixed(2)} PLN{" "}
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      disabled={invoiceData.items.length === 1}
-                      onClick={() => {
-                        const newItems = invoiceData.items.filter(
-                          (_, i) => i !== index
-                        );
-                        setInvoiceData({ ...invoiceData, items: newItems });
-                      }}
-                    >
-                      ×
-                    </Button>
-                  </div>
+            {invoiceData.items.map((item, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end border-b pb-4"
+              >
+                <div className="md:col-span-3 space-y-2">
+                  <Label htmlFor={`item-description-${index}`}>Opis</Label>
+                  <Input
+                    id={`item-description-${index}`}
+                    value={item.description}
+                    onChange={(e) => {
+                      const newItems = [...invoiceData.items];
+                      newItems[index].description = e.target.value;
+                      setInvoiceData({ ...invoiceData, items: newItems });
+                    }}
+                  />
                 </div>
-              );
-            })}
+                <div className="md:col-span-1 space-y-2">
+                  <Label htmlFor={`item-quantity-${index}`}>Ilość</Label>
+                  <Input
+                    id={`item-quantity-${index}`}
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => {
+                      const newItems = [...invoiceData.items];
+                      newItems[index].quantity = Number(e.target.value);
+                      setInvoiceData({ ...invoiceData, items: newItems });
+                    }}
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor={`item-net-price-${index}`}>Cena netto</Label>
+                  <Input
+                    id={`item-net-price-${index}`}
+                    type="number"
+                    step="0.01"
+                    value={item.netPrice}
+                    onChange={(e) => {
+                      const newItems = [...invoiceData.items];
+                      const netValue = Number(e.target.value);
+                      const vatRate = newItems[index].vatRate;
+                      newItems[index] = {
+                        ...newItems[index],
+                        netPrice: netValue,
+                        bruttoPrice: netValue * (1 + vatRate / 100),
+                      };
+                      setInvoiceData({ ...invoiceData, items: newItems });
+                    }}
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor={`item-vat-rate-${index}`}>Stawka VAT</Label>
+                  <Select
+                    value={String(item.vatRate)}
+                    onValueChange={(value) => {
+                      const newItems = [...invoiceData.items];
+                      const vatRate = Number(value);
+                      newItems[index] = {
+                        ...newItems[index],
+                        vatRate,
+                        bruttoPrice:
+                          newItems[index].netPrice * (1 + vatRate / 100),
+                      };
+                      setInvoiceData({ ...invoiceData, items: newItems });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="23">23%</SelectItem>
+                      <SelectItem value="8">8%</SelectItem>
+                      <SelectItem value="5">5%</SelectItem>
+                      <SelectItem value="0">0%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor={`item-brutto-price-${index}`}>
+                    Cena brutto
+                  </Label>
+                  <Input
+                    id={`item-brutto-price-${index}`}
+                    type="number"
+                    step="0.01"
+                    value={item.bruttoPrice}
+                    readOnly
+                  />
+                </div>
+                <div className="md:col-span-2 flex justify-end">
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    disabled={invoiceData.items.length === 1}
+                    onClick={() => {
+                      const newItems = invoiceData.items.filter(
+                        (_, i) => i !== index
+                      );
+                      setInvoiceData({ ...invoiceData, items: newItems });
+                    }}
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
+            ))}
 
             {/* Summary section */}
             <div className="mt-4 space-y-2">
@@ -753,45 +980,15 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        {/* Bank Account Selection */}
-        {invoiceData.seller.companyId && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Dane do przelewu</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label>Konto bankowe</Label>
-                <Select
-                  value={invoiceData.seller.bankAccount}
-                  onValueChange={(value) => {
-                    setInvoiceData({
-                      ...invoiceData,
-                      seller: { ...invoiceData.seller, bankAccount: value },
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Wybierz konto bankowe" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {data.companies
-                      .find((c) => c.id === invoiceData.seller.companyId)
-                      ?.bankAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.departmentName} - {account.accountNumber}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Actions */}
+        <div className="flex justify-end space-x-4">
+          <Button variant="outline">Anuluj</Button>
+          <Button onClick={handleCreateInvoice}>Zapisz fakturę</Button>
+        </div>
 
-        {/* Generate Invoice Button */}
-        <div className="flex justify-end mt-6">
-          <PDFPreview data={debouncedInvoiceData} />
+        {/* PDF Preview */}
+        <div className="mt-6">
+          <PDFPreview data={invoiceData} />
         </div>
       </div>
     </div>
