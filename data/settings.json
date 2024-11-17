@@ -1,0 +1,83 @@
+{
+  "vatRates": [
+    {
+      "rate": 23,
+      "description": "Podstawowa stawka VAT",
+      "code": "23"
+    },
+    {
+      "rate": 8,
+      "description": "Obniżona stawka VAT",
+      "code": "8"
+    },
+    {
+      "rate": 5,
+      "description": "Obniżona stawka VAT",
+      "code": "5"
+    },
+    {
+      "rate": 0,
+      "description": "Zerowa stawka VAT",
+      "code": "0"
+    },
+    {
+      "rate": 0,
+      "description": "Zwolniony z VAT",
+      "code": "zw"
+    },
+    {
+      "rate": null,
+      "description": "Bez VAT",
+      "code": "bv"
+    }
+  ],
+  "companies": [
+    {
+      "id": "specroll",
+      "name": "Patryk Biegański - SPECROLL",
+      "address": {
+        "street": "ul. Ignacego Daszyńskiego 29/5",
+        "postalCode": "58-304",
+        "city": "Wałbrzych"
+      },
+      "nip": "8863018777",
+      "regon": "520410221",
+      "legalForm": "indywidualna działalność gospodarcza",
+      "owner": "Patryk Biegański",
+      "startDate": "2021-11-10",
+      "bankAccounts": [
+        {
+          "id": "main",
+          "departmentName": "Konto główne",
+          "bankName": "TO_BE_ADDED",
+          "accountNumber": "TO_BE_ADDED",
+          "swift": "TO_BE_ADDED"
+        }
+      ]
+    },
+    {
+      "id": "sadowski-transport",
+      "name": "Cezary Sadowski - Usługi transportowe",
+      "address": {
+        "street": "ul. Ignacego Daszyńskiego 31/8",
+        "postalCode": "58-304",
+        "city": "Wałbrzych"
+      },
+      "nip": "8863032642",
+      "regon": "528288340",
+      "legalForm": "indywidualna działalność gospodarcza",
+      "owner": "Cezary Sadowski",
+      "startDate": "2024-04-05",
+      "bankAccounts": [
+        {
+          "id": "main",
+          "departmentName": "Konto główne",
+          "bankName": "TO_BE_ADDED",
+          "accountNumber": "TO_BE_ADDED",
+          "swift": "TO_BE_ADDED"
+        }
+      ]
+    }
+  ],
+  "possibleTimeToPay": ["7 dni", "14 dni", "30 dni"]
+}
