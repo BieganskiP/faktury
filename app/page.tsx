@@ -419,7 +419,6 @@ export default function Home() {
   }, [invoiceData.seller.companyId]);
 
   const handleCreateInvoice = async () => {
-    // Validate required fields
     if (
       !invoiceData.invoiceNumber ||
       !invoiceData.dateIssued ||

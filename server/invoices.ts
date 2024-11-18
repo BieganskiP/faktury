@@ -6,7 +6,6 @@ import { ApiResponse, BuyerCompany } from "@/types/globals";
 
 const prisma = new PrismaClient();
 
-// Seller Company Actions
 export async function addSellerCompany(data: {
   name: string;
   address: string;
@@ -142,7 +141,6 @@ export async function getSellerCompaniesSimple() {
   }
 }
 
-// Buyer Company Actions
 export async function addBuyerCompany(data: {
   name: string;
   address: string;
@@ -233,7 +231,6 @@ export async function getBuyersForSeller(sellerId: string) {
   }
 }
 
-// Invoice Actions
 export async function createInvoice(data: InvoiceData) {
   "use server";
 
@@ -457,6 +454,7 @@ export async function deleteBuyerCompany(
     };
   }
 }
+
 export async function deleteSellerCompany(id: string) {
   try {
     // First delete all related invoices and buyer relationships
@@ -483,17 +481,39 @@ export async function updateBuyerCompany(
     address?: string;
     nip?: string;
   }
-) {
+): Promise<ApiResponse<BuyerCompany>> {
   try {
     const buyer = await prisma.buyerCompany.update({
       where: { id },
       data,
+      include: {
+        sellers: {
+          select: {
+            id: true,
+          },
+        },
+      },
     });
+
+    const transformedBuyer = {
+      id: buyer.id,
+      name: buyer.name,
+      address: buyer.address,
+      nip: buyer.nip,
+      sellerId: buyer.sellers[0]?.id || "",
+    };
+
     revalidatePath("/");
-    return { success: true, data: buyer };
+    return { success: true, data: transformedBuyer };
   } catch (error) {
     console.error("Failed to update buyer company:", error);
-    return { success: false, error: "Failed to update buyer company" };
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update buyer company",
+    };
   }
 }
 

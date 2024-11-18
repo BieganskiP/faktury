@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,9 +17,11 @@ import {
   addSellerCompany,
   addBuyerCompany,
   getSellerCompaniesSimple,
+  updateSellerCompany,
+  updateBuyerCompany,
 } from "@/server/invoices";
 import { useToast } from "@/hooks/use-toast";
-import { SellerCompany } from "@/types/globals";
+import { SellerCompany, BuyerCompany } from "@/types/globals";
 import {
   Select,
   SelectContent,
@@ -28,28 +29,58 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 
-type AddCompanyDialogProps = {
-  onCompanyAdded: (company: SellerCompany) => void;
+type CompanyDialogProps<T extends BuyerCompany | SellerCompany> = {
+  onCompanyAdded: (company: T) => void;
+  existingCompany?: {
+    type: "seller" | "buyer";
+    data: T;
+  };
 };
 
-export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
+export function AddCompanyDialog<T extends BuyerCompany | SellerCompany>({
+  onCompanyAdded,
+  existingCompany,
+}: CompanyDialogProps<T>) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [sellers, setSellers] = useState<{ id: string; name: string }[]>([]);
 
   const [sellerData, setSellerData] = useState({
-    name: "",
-    address: "",
-    nip: "",
-    bankAccounts: [], // Empty array for initial creation
-    buyerId: "", // Added buyerId to sellerData
+    name:
+      existingCompany?.type === "seller"
+        ? (existingCompany.data as SellerCompany).name
+        : "",
+    address:
+      existingCompany?.type === "seller"
+        ? (existingCompany.data as SellerCompany).address
+        : "",
+    nip:
+      existingCompany?.type === "seller"
+        ? (existingCompany.data as SellerCompany).nip
+        : "",
+    bankAccounts:
+      existingCompany?.type === "seller"
+        ? (existingCompany.data as SellerCompany).bankAccounts
+        : [],
   });
 
   const [buyerData, setBuyerData] = useState({
-    name: "",
-    address: "",
-    nip: "",
-    sellerId: "",
+    name:
+      existingCompany?.type === "buyer"
+        ? (existingCompany.data as BuyerCompany).name
+        : "",
+    address:
+      existingCompany?.type === "buyer"
+        ? (existingCompany.data as BuyerCompany).address
+        : "",
+    nip:
+      existingCompany?.type === "buyer"
+        ? (existingCompany.data as BuyerCompany).nip
+        : "",
+    sellerId:
+      existingCompany?.type === "buyer"
+        ? (existingCompany.data as BuyerCompany).sellerId
+        : "",
   });
 
   useEffect(() => {
@@ -65,30 +96,32 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
   const handleSellerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const result = await addSellerCompany(sellerData);
+      const result = existingCompany?.data?.id
+        ? await updateSellerCompany(existingCompany.data.id, sellerData)
+        : await addSellerCompany(sellerData);
+
       if (result.success && result.data) {
         toast({
           title: "Sukces",
-          description: "Firma została dodana pomyślnie",
+          description: `Firma została ${
+            existingCompany ? "zaktualizowana" : "dodana"
+          } pomyślnie`,
         });
-        onCompanyAdded(result.data);
+        onCompanyAdded(result.data as T);
         setOpen(false);
-        setSellerData({
-          name: "",
-          address: "",
-          nip: "",
-          bankAccounts: [],
-          buyerId: "",
-        });
       } else {
         toast({
           title: "Błąd",
-          description: result.error || "Nie udało się dodać firmy",
+          description:
+            result.error ||
+            `Nie udało się ${
+              existingCompany ? "zaktualizować" : "dodać"
+            } firmy`,
           variant: "destructive",
         });
       }
     } catch (err) {
-      console.error("Error adding seller company:", err);
+      console.error("Error handling seller company:", err);
       toast({
         title: "Błąd",
         description: "Wystąpił nieoczekiwany błąd",
@@ -100,23 +133,49 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
   const handleBuyerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const result = await addBuyerCompany(buyerData);
-      if (result.success && result.data) {
-        toast({
-          title: "Sukces",
-          description: "Firma została dodana pomyślnie",
-        });
-        setOpen(false);
-        setBuyerData({ name: "", address: "", nip: "", sellerId: "" });
+      if (existingCompany?.data?.id) {
+        const updateData = {
+          name: buyerData.name,
+          address: buyerData.address,
+          nip: buyerData.nip,
+        };
+        const result = await updateBuyerCompany(
+          existingCompany.data.id,
+          updateData
+        );
+        if (result.success && result.data) {
+          toast({
+            title: "Sukces",
+            description: "Firma została zaktualizowana pomyślnie",
+          });
+          onCompanyAdded(result.data as T);
+          setOpen(false);
+        } else {
+          toast({
+            title: "Błąd",
+            description: result.error || "Nie udało się zaktualizować firmy",
+            variant: "destructive",
+          });
+        }
       } else {
-        toast({
-          title: "Błąd",
-          description: result.error || "Nie udało się dodać firmy",
-          variant: "destructive",
-        });
+        const result = await addBuyerCompany(buyerData);
+        if (result.success && result.data) {
+          toast({
+            title: "Sukces",
+            description: "Firma została dodana pomyślnie",
+          });
+          onCompanyAdded(result.data as T);
+          setOpen(false);
+        } else {
+          toast({
+            title: "Błąd",
+            description: result.error || "Nie udało się dodać firmy",
+            variant: "destructive",
+          });
+        }
       }
     } catch (err) {
-      console.error("Error adding buyer company:", err);
+      console.error("Error handling buyer company:", err);
       toast({
         title: "Błąd",
         description: "Wystąpił nieoczekiwany błąd",
@@ -130,7 +189,7 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
-          Dodaj firmę
+          {existingCompany ? "Edytuj dane firmy" : "Dodaj firmę"}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
@@ -186,7 +245,7 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
               </div>
 
               <Button type="submit" className="w-full">
-                Dodaj sprzedawcę
+                {existingCompany ? "Zapisz zmiany" : "Dodaj sprzedawcę"}
               </Button>
             </form>
           </TabsContent>
@@ -255,7 +314,7 @@ export function AddCompanyDialog({ onCompanyAdded }: AddCompanyDialogProps) {
               </div>
 
               <Button type="submit" className="w-full">
-                Dodaj nabywcę
+                {existingCompany ? "Zapisz zmiany" : "Dodaj nabywcę"}
               </Button>
             </form>
           </TabsContent>

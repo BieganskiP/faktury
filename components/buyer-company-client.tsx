@@ -4,6 +4,7 @@ import { useState } from "react";
 import { deleteBuyerCompany } from "@/server/invoices";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { AddCompanyDialog } from "@/components/company-dialog";
 
 type BuyerCompaniesClientProps = {
   initialCompanies: ApiResponse<BuyerCompany[]>;
@@ -35,6 +36,15 @@ export function BuyerCompaniesClient({
     }
   };
 
+  const handleUpdateCompany = (updatedCompany: BuyerCompany) => {
+    setCompanies({
+      ...companies,
+      data:
+        companies.data?.map((company) =>
+          company.id === updatedCompany.id ? updatedCompany : company
+        ) || [],
+    });
+  };
   return (
     <>
       <div className="flex justify-between items-center mb-6">
@@ -51,12 +61,20 @@ export function BuyerCompaniesClient({
                 <span>
                   {company.name}, {company.address}, {company.nip}
                 </span>
-                <Button
-                  variant="outline"
-                  onClick={() => handleDelete(company.id)}
-                >
-                  Usuń
-                </Button>
+                <div className="flex gap-2">
+                  <AddCompanyDialog
+                    onCompanyAdded={(newCompany: BuyerCompany) => {
+                      handleUpdateCompany(newCompany);
+                    }}
+                    existingCompany={{ type: "buyer", data: company }}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDelete(company.id)}
+                  >
+                    Usuń
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
