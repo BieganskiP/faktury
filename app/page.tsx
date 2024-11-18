@@ -890,8 +890,8 @@ export default function Home() {
                   <Label htmlFor={`item-net-price-${index}`}>Cena netto</Label>
                   <Input
                     id={`item-net-price-${index}`}
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    pattern="^\d+(\.\d{1,2})?$|^\d+(\,\d{1,2})?$"
                     value={item.netPrice}
                     onChange={(e) => {
                       const newItems = [...invoiceData.items];
@@ -900,7 +900,9 @@ export default function Home() {
                       newItems[index] = {
                         ...newItems[index],
                         netPrice: netValue,
-                        bruttoPrice: netValue * (1 + vatRate / 100),
+                        bruttoPrice: Number(
+                          (netValue * (1 + vatRate / 100)).toFixed(2)
+                        ),
                       };
                       setInvoiceData({ ...invoiceData, items: newItems });
                     }}
@@ -939,10 +941,22 @@ export default function Home() {
                   </Label>
                   <Input
                     id={`item-brutto-price-${index}`}
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    pattern="^\d+(\.\d{1,2})?$|^\d+(\,\d{1,2})?$"
                     value={item.bruttoPrice}
-                    readOnly
+                    onChange={(e) => {
+                      const newItems = [...invoiceData.items];
+                      const bruttoValue = Number(e.target.value);
+                      const vatRate = newItems[index].vatRate;
+                      newItems[index] = {
+                        ...newItems[index],
+                        bruttoPrice: bruttoValue,
+                        netPrice: Number(
+                          (bruttoValue / (1 + vatRate / 100)).toFixed(2)
+                        ),
+                      };
+                      setInvoiceData({ ...invoiceData, items: newItems });
+                    }}
                   />
                 </div>
                 <div className="md:col-span-2 flex justify-end">
